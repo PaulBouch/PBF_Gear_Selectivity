@@ -1,15 +1,18 @@
 library(icesDatras)
 library(ggplot2)
+library(mgcv)
+library(dplyr)
+library(reshape)
 
 Species <- c("Gadus morhua", "Melanogrammus aeglefinus", "Pollachius virens", "Solea solea", 
-  "Pleuronectes platessa", "Merlangius merlangus", "Scophthalmus maximus",
-  "Glyptocephalus cynoglossus", "Platichthys flesus", "Scophthalmus rhombus",
-  "Limanda limanda", "Molva molva", "Squalus acanthias", "Raja clavata",
-  "Leucoraja naevus", "Raja montagui", "Hippoglossus hippoglossus",
-  "Chelidonichthys cuculus", "Scyliorhinus canicula", "Merluccius merluccius",
-  "Lepidorhombus whiffiagonis", "Trachurus trachurus", "Scomber scombrus",
-  "Micromesistius poutassou", "Dicentrarchus labrax", "Mullus surmuletus",
-  "Lophius piscatorius", "Lophius budegassa", "Conger conger", "Lepidorhombus boscii")
+             "Pleuronectes platessa", "Merlangius merlangus", "Scophthalmus maximus",
+             "Glyptocephalus cynoglossus", "Platichthys flesus", "Scophthalmus rhombus",
+             "Limanda limanda", "Molva molva", "Squalus acanthias", "Raja clavata",
+             "Leucoraja naevus", "Raja montagui", "Hippoglossus hippoglossus",
+             "Chelidonichthys cuculus", "Scyliorhinus canicula", "Merluccius merluccius",
+             "Lepidorhombus whiffiagonis", "Trachurus trachurus", "Scomber scombrus",
+             "Micromesistius poutassou", "Dicentrarchus labrax", "Mullus surmuletus",
+             "Lophius piscatorius", "Lophius budegassa", "Conger conger", "Lepidorhombus boscii")
 
 Valid_Aphia = icesVocab::findAphia(c("Gadus morhua", "Melanogrammus aeglefinus", "Pollachius virens", "Solea solea", 
                                 "Pleuronectes platessa", "Merlangius merlangus", "Scophthalmus maximus",
@@ -43,10 +46,36 @@ igfs <- igfs_raw[!is.na (igfs_raw$Age),]
 igfs <- merge(igfs, Aphia_Sp)
 unique(igfs$Species)
 
+igfs$Age[igfs$Age>10]<- 10
+
+igfs$Age <- as.numeric(igfs$Age)
 
 igfs_laa <- igfs %>% 
-  group_by(Species, Age) %>% 
-  summarise(lgt_at_age = weighted.mean(x=LngtClass, w=NoAtALK)/10)
+   group_by(Species, Age) %>% 
+   summarise(lgt_at_age = weighted.mean(x=LngtClass, w=NoAtALK)/10)
+
+all_laa_igfs <- data.frame()
+
+for (i in unique(igfs$Species)){
+  model <-  nls(lgt_at_age ~ SSlogis(Age, phi1, phi2, phi3), 
+                data = igfs_laa[igfs_laa$Species== i,])
+  
+  temp <- as.data.frame(cbind(igfs_laa[igfs_laa$Species==i,],model_laa=predict(model)))
+  
+  all_laa_igfs <- rbind(all_laa_igfs, temp)
+}
+
+all_laa_igfs$Survey <- "IGFS"
+
+### test plots
+ggplot(all_laa_igfs, aes(x=Age, y = model_laa, colour = Species))+
+  geom_line()
+
+test <- melt(all_laa_igfs, id.vars = c("Species", "Age", "Survey"))
+
+ggplot(test, aes(x= Age, y = value, colour = variable))+
+  geom_line()+
+  facet_wrap(~Species)
 
 
 #### NS IBTS
@@ -71,6 +100,9 @@ unique(NS_IBTS$Species)
 unique(NS_IBTS$Age)
 NS_IBTS$Age[NS_IBTS$Age >10] <- 10
 
+NS_IBTS <- NS_IBTS[NS_IBTS$LngtCode %in% c(".", "1"), ]
+NS_IBTS$LngtClass[NS_IBTS$LngtCode %in% "1"] <- NS_IBTS$LngtClass[NS_IBTS$LngtCode %in% "1"] *10 
+
 NS_IBTS_laa <-NS_IBTS %>% 
   group_by(Species, Age) %>% 
   summarise(lgt_at_age = weighted.mean(x=LngtClass, w=NoAtALK)/10)
@@ -78,29 +110,35 @@ NS_IBTS_laa <-NS_IBTS %>%
 ggplot(NS_IBTS_laa, aes(x= Age, y = lgt_at_age, colour = Species))+
   geom_line()
 
-####################################################
-#### needs fixing!
+
 
 all_laa_NS <- data.frame()
 
 for (i in unique(NS_IBTS$Species)){
-  model <- mgcv::gam(LngtClass ~ Age,
-                     data = NS_IBTS[NS_IBTS$Species== i,])
+  try(model <-  nls(lgt_at_age ~ SSlogis(Age, phi1, phi2, phi3), 
+                data = NS_IBTS_laa[NS_IBTS_laa$Species== i,]))
   
-  temp <- cbind(NS_IBTS[NS_IBTS$Species==i,],fitted=predict(model))
-  temp <- temp[order(temp$Age),]
+  try(temp <- as.data.frame(cbind(NS_IBTS_laa[NS_IBTS_laa$Species==i,],model_laa=predict(model))))
   
-  new <- data.frame(Age=unique(temp$Age))
-  
-  new$mean_length_at_age = predict(model, new, se.fit = TRUE)$fit/10
-  
-  new$species <- i
-  
-  all_laa_NS <- rbind(all_laa_NS, new)
-  
-  assign (paste0(i, "_laa_NS"), new)
+  try(all_laa_NS <- rbind(all_laa_NS, temp))
 }
 
-ggplot(all_laa_NS, aes(x= as.numeric(Age), y = mean_length_at_age, colour = species))+
+all_laa_NS$Survey <- "NS_IBTS"
+
+ggplot(all_laa_NS, aes(x=Age, y = model_laa, colour = Species))+
+  geom_line()
+
+test2 <- melt(all_laa_NS, id.vars = c("Species", "Age", "Survey"))
+
+ggplot(test2, aes(x= Age, y = value, colour = variable))+
+  geom_line()+
+  facet_wrap(~Species)
+
+
+Survey_laa <- rbind(all_laa_NS, all_laa_igfs)  
+save(Survey_laa, file = "Survey_laa.RData")
+
+ggplot(Survey_laa, aes(x= as.numeric(Age), y = model_laa, colour = Survey))+
+  facet_wrap(~Species)+
   geom_line()
 
