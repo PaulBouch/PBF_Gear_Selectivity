@@ -16,8 +16,10 @@ colnames(Survey_laa)[2] <- "age"
 
 laa <- rbind(ALK_laa, Survey_laa)
 
+pdf("plots/ALK Comprisons.pdf")
 ggplot(laa, aes(x=age, y = model_laa, colour = method))+
   geom_line()+
   facet_wrap(~Species, scales = "free")
+dev.off()
 
 
