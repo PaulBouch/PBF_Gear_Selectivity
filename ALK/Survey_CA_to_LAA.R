@@ -142,3 +142,7 @@ ggplot(Survey_laa, aes(x= as.numeric(Age), y = model_laa, colour = Survey))+
   facet_wrap(~Species)+
   geom_line()
 
+### raw survey data
+#save(igfs, NS_IBTS, file = "ALK/raw_survey.RData")
+
+

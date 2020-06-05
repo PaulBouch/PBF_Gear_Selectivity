@@ -141,7 +141,7 @@ for (i in unique(CS_laa$Species)){
 }
 
 
-ggplot(all_laa_CS, aes(x= as.numeric(age), y = mean_length_at_age, colour = species))+
+ggplot(all_laa_CS, aes(x= as.numeric(age), y = model_laa, colour = Species))+
   geom_line()
 
 ### Compile the relevant ALKs
@@ -156,3 +156,7 @@ save(ALK_laa, file = "ALK_laa.RData")
 ggplot(ALK_laa, aes(x= as.numeric(age), y = model_laa, colour = ALK))+
   facet_wrap(~Species)+
   geom_line()
+
+save(BTS_alk, CS_alk2, NS_alk, file = "ALK/raw_alk.RData")
+
+
