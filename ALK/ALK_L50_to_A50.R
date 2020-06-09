@@ -56,6 +56,17 @@ BTS_alk <- read.csv ("ALK/ALK_BTS.csv")
 head(BTS_alk)
 BTS_alk[c(paste("Age",seq(0,10),sep="_"))] <- sapply(BTS_alk[c(paste("Age",seq(0,10),sep="_"))], as.numeric)
 
+### tidy some data
+BTS_alk$Age_1 <- BTS_alk$Age_1 -1 
+BTS_alk$Age_2 <- BTS_alk$Age_2 -1 
+BTS_alk$Age_3 <- BTS_alk$Age_3 -1 
+
+#remove the -9 class
+BTS_alk <- BTS_alk[BTS_alk$LngtClass>0, ]
+
+# if below 60 length, assume cm
+BTS_alk$LngtClass[BTS_alk$LngtClass > 60] <- BTS_alk$LngtClass[BTS_alk$LngtClass > 60]/10
+
 
 setDT(BTS_alk)
 BTS_alk <- melt(BTS_alk, measure.vars = c(paste("Age",seq(0,10),sep="_")))
@@ -66,6 +77,9 @@ BTS_alk = BTS_alk %>%
   summarise(number = sum(number, na.rm=T))
 
 BTS_alk$age <- as.numeric(BTS_alk$age)
+
+BTS_alk <- BTS_alk[BTS_alk$age == 1 & BTS_alk$LngtClass < 25 | BTS_alk$age %in% c(2:4)  | BTS_alk$age > 4 & BTS_alk$LngtClass > 15, ]
+
 
 laa_BTS = BTS_alk %>% 
   group_by(Survey, Year, Quarter,AphiaID, Species, age) %>% 
@@ -87,7 +101,7 @@ for (i in unique(laa_BTS$Species)){
                          filter(!is.na(lgt_at_age)))
   
   
-  temp$model_laa <- predict(model, temp)/10
+  temp$model_laa <- predict(model, temp)
   
   all_laa_BTS <- rbind(all_laa_BTS, temp)
 }

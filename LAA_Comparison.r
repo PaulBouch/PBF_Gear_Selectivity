@@ -76,7 +76,7 @@ plot_survey_IGFS <- ggplot(igfs[igfs$Species == i,], aes(Age, LngtClass/10))+
 if(i %in% c("Pleuronectes platessa", "Solea solea")){
   df_bts <- BTS_alk[BTS_alk$Species == i & BTS_alk$number >0,]
   
-  plot_ALK_BTS <- ggplot(df_bts, aes(age, LngtClass/10))+
+  plot_ALK_BTS <- ggplot(df_bts, aes(age, LngtClass))+
     geom_point()+
     ylab("Length")+
     ggtitle("BTS ALK Data")+

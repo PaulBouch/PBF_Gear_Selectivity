@@ -81,5 +81,6 @@ for (i in unique(retentions$method)){
   dev.off()
 }
 
+save(retentions, file = "gear_selectivity.RData")
 
 

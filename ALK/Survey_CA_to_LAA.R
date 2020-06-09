@@ -44,7 +44,18 @@ head(igfs_raw)
 igfs <- igfs_raw[!is.na (igfs_raw$Age),]
 
 igfs <- merge(igfs, Aphia_Sp)
-unique(igfs$Species)
+
+# remove the year zero for ple and sol
+
+plesol <- igfs[igfs$Species %in% c("Solea solea", "Pleuronectes platessa"), ]
+plesol <- plesol[plesol$Age != 0, ]
+
+ifgs_noplesol <- igfs[igfs$Species != "Solea solea", ]
+unique(ifgs_noplesol$Species)
+ifgs_noplesol <- ifgs_noplesol[ifgs_noplesol$Species != "Pleuronectes platessa", ]
+
+igfs <- rbind(ifgs_noplesol, plesol)
+
 
 igfs$Age[igfs$Age>10]<- 10
 
@@ -143,6 +154,6 @@ ggplot(Survey_laa, aes(x= as.numeric(Age), y = model_laa, colour = Survey))+
   geom_line()
 
 ### raw survey data
-#save(igfs, NS_IBTS, file = "ALK/raw_survey.RData")
+save(igfs, NS_IBTS, file = "ALK/raw_survey.RData")
 
 
