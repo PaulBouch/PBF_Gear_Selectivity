@@ -1,0 +1,192 @@
+# SELECTIVITY FROM LENGTH TO AGES
+#################################
+rm(list=ls())
+
+library(readxl)
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(mgcv)
+
+NS_alk <- read.csv ("ALK/ALK_NS_IBTS.csv")
+head(NS_alk)
+NS_alk[c(paste("Age",seq(0,10),sep="_"))] <- sapply(NS_alk[c(paste("Age",seq(0,10),sep="_"))], as.numeric)
+
+NS_alk <- NS_alk[NS_alk$Year>2014, ]
+
+setDT(NS_alk)
+NS_alk <- melt(NS_alk, measure.vars = c(paste("Age",seq(0,10),sep="_")))
+names(NS_alk)[names(NS_alk)=="variable"]="age"; names(NS_alk)[names(NS_alk)=="value"]="number"
+
+NS_alk = NS_alk %>% 
+  group_by(Survey, Year, Quarter, Area, AphiaID, Species, LngtClass, age) %>% 
+  summarise(number = sum(number, na.rm=T))
+
+laa_NS = NS_alk %>% 
+  group_by(Survey, Year, Quarter, Area, AphiaID, Species, age) %>% 
+  summarise(lgt_at_age = weighted.mean(x=LngtClass, w=number)) %>% # WEIGHTED MEAN!!
+  filter(!is.na(lgt_at_age))
+
+
+all_laa_NS <- data.frame()
+
+for (i in unique(laa_NS$Species)){
+  model <- mgcv::gam(lgt_at_age ~ age,
+                     data = laa_NS[laa_NS$Species== i,])
+  
+  temp = as.data.frame(NS_alk[NS_alk$Species == i, ] %>% 
+    group_by(Species, age) %>% 
+    summarise(lgt_at_age = weighted.mean(x=LngtClass, w=number)) %>% # WEIGHTED MEAN!!
+    filter(!is.na(lgt_at_age)))
+  
+  temp$model_laa <- predict(model, temp)/10
+
+  all_laa_NS <- rbind(all_laa_NS, temp)
+}
+
+
+ggplot(all_laa_NS, aes(x= as.numeric(age), y = model_laa, colour = Species))+
+  geom_line()+
+  ggtitle("NS")
+
+####################################################################################
+####################################################################################
+###############     Try the BTS alk
+
+BTS_alk <- read.csv ("ALK/ALK_BTS.csv")
+head(BTS_alk)
+BTS_alk[c(paste("Age",seq(0,10),sep="_"))] <- sapply(BTS_alk[c(paste("Age",seq(0,10),sep="_"))], as.numeric)
+
+BTS_alk <- BTS_alk[BTS_alk$Year>2014, ]
+
+### tidy some data
+BTS_alk$Age_1 <- BTS_alk$Age_1 -1 
+BTS_alk$Age_2 <- BTS_alk$Age_2 -1 
+BTS_alk$Age_3 <- BTS_alk$Age_3 -1 
+
+#remove the -9 class
+BTS_alk <- BTS_alk[BTS_alk$LngtClass>0, ]
+
+# if below 60 length, assume cm
+BTS_alk$LngtClass[BTS_alk$LngtClass > 60] <- BTS_alk$LngtClass[BTS_alk$LngtClass > 60]/10
+
+
+setDT(BTS_alk)
+BTS_alk <- melt(BTS_alk, measure.vars = c(paste("Age",seq(0,10),sep="_")))
+names(BTS_alk)[names(BTS_alk)=="variable"]="age"; names(BTS_alk)[names(BTS_alk)=="value"]="number"
+
+BTS_alk = BTS_alk %>% 
+  group_by(Survey, Year, Quarter, AphiaID, Species, LngtClass, age) %>% 
+  summarise(number = sum(number, na.rm=T))
+
+BTS_alk$age <- as.numeric(BTS_alk$age)
+
+BTS_alk <- BTS_alk[BTS_alk$age == 1 & BTS_alk$LngtClass < 25 | BTS_alk$age %in% c(2:4)  | BTS_alk$age > 4 & BTS_alk$LngtClass > 15, ]
+
+
+laa_BTS = BTS_alk %>% 
+  group_by(Survey, Year, Quarter,AphiaID, Species, age) %>% 
+  summarise(lgt_at_age = weighted.mean(x=LngtClass, w=number)) %>% # WEIGHTED MEAN!!
+  filter(!is.na(lgt_at_age))
+
+all_laa_BTS <- data.frame()
+
+for (i in unique(laa_BTS$Species)){
+  # model <- mgcv::gam(lgt_at_age ~ age,
+  #                    data = laa_BTS[laa_BTS$Species== i,])
+
+  model <- nls(lgt_at_age ~ SSlogis(age, phi1, phi2, phi3),
+      data = laa_BTS[laa_BTS$Species== i,])
+  
+  temp = as.data.frame(BTS_alk[BTS_alk$Species == i, ] %>% 
+                         group_by(Species, age) %>% 
+                         summarise(lgt_at_age = weighted.mean(x=LngtClass, w=number)) %>% # WEIGHTED MEAN!!
+                         filter(!is.na(lgt_at_age)))
+  
+  
+  temp$model_laa <- predict(model, temp)
+  
+  all_laa_BTS <- rbind(all_laa_BTS, temp)
+}
+
+
+ggplot(all_laa_BTS, aes(x= as.numeric(age), y = model_laa, colour = Species))+
+  geom_line()+
+  ggtitle("BTS")
+
+
+### Can we try for the Celtic Sea?
+
+CS_alk <- read.csv ("ALK/ALK_2020_EVHOE.csv")
+
+head(CS_alk)
+CS_alk[c(paste("Age",seq(0,10),sep="_"))] <- sapply(CS_alk[c(paste("Age",seq(0,10),sep="_"))], as.numeric)
+
+CS_alk <- CS_alk[CS_alk$Year>2014, ]
+
+setDT(CS_alk)
+CS_alk <- melt(CS_alk, measure.vars = c(paste("Age",seq(0,10),sep="_")))
+names(CS_alk)[names(CS_alk)=="variable"]="age"; names(CS_alk)[names(CS_alk)=="value"]="number"
+
+head(CS_alk)
+
+
+CS_alk2 = CS_alk %>% 
+  group_by(Year, Quarter, Area, AphiaID, Species, LngtClass, age) %>% 
+  summarise(number = sum(number, na.rm=T))
+
+CS_alk2$age <- as.numeric(CS_alk2$age)
+
+CS_laa = CS_alk2 %>% 
+  group_by(Species, age) %>% 
+  summarise(lgt_at_age = weighted.mean(x=LngtClass, w=number)) %>% # WEIGHTED MEAN!!
+  filter(!is.na(lgt_at_age))
+
+# laa$age <- as.numeric(substring(laa$age, 5,5))
+
+
+all_laa_CS <- data.frame()
+
+for (i in unique(CS_laa$Species)){
+#  model <- mgcv::gam(lgt_at_age ~ age,
+#                     data = CS_laa[CS_laa$Species== i,])
+
+  model <- nls(lgt_at_age ~ SSlogis(age, phi1, phi2, phi3), 
+       data = CS_laa[CS_laa$Species== i,])
+
+  temp <- as.data.frame(cbind(CS_laa[CS_laa$Species==i,],model_laa=predict(model)/10))
+  
+  all_laa_CS <- rbind(all_laa_CS, temp)
+}
+
+
+ggplot(all_laa_CS, aes(x= as.numeric(age), y = model_laa, colour = Species))+
+  geom_line()
+
+### Compile the relevant ALKs
+all_laa_BTS$ALK <- "BTS5"
+all_laa_NS$ALK <- "NS5"
+all_laa_NS$age <- as.numeric(all_laa_NS$age)
+all_laa_CS$ALK <- "CS5"
+
+ALK_laa5 <- rbind(all_laa_BTS, all_laa_CS, all_laa_NS)  
+save(ALK_laa5, file = "ALK_laa5.RData")
+
+ggplot(ALK_laa5, aes(x= as.numeric(age), y = model_laa, colour = ALK))+
+  facet_wrap(~Species)+
+  geom_line()
+
+BTS_alk_5 <- BTS_alk
+NS_alk_5 <- NS_alk
+CS_alk_5 <- CS_alk2
+save(BTS_alk_5, CS_alk_5, NS_alk_5, file = "ALK/raw_alk5.RData")
+
+
+load("ALK_laa.RData")
+
+test <- rbind(ALK_laa, ALK_laa5)
+
+ggplot(test, aes(x= as.numeric(age), y = model_laa, colour = ALK))+
+  facet_wrap(~Species)+
+  geom_line()
+
